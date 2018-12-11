@@ -78,6 +78,7 @@ gpi_objtype_t to_gpi_objtype(int32_t vpitype)
         case vpiNetBit:
         case vpiReg:
         case vpiRegBit:
+        case vpiPort:
         case vpiMemoryWord:
             return GPI_REGISTER;
 
@@ -113,12 +114,12 @@ gpi_objtype_t to_gpi_objtype(int32_t vpitype)
         case vpiInterface:
         case vpiModule:
         case vpiRefObj:
-        case vpiPort:
         case vpiAlways:
         case vpiFunction:
         case vpiInitial:
         case vpiGate:
         case vpiPrimTerm:
+        case vpiScope:
         case vpiGenScope:
             return GPI_MODULE;
 
@@ -154,6 +155,7 @@ GpiObjHdl* VpiImpl::create_gpi_obj_from_handle(vpiHandle new_hdl,
         case vpiIntegerVar:
         case vpiIntegerNet:
         case vpiRealVar:
+        case vpiPort:
         case vpiStringVar:
         case vpiMemoryWord:
             new_obj = new VpiSignalObjHdl(this, new_hdl, to_gpi_objtype(type), false);
@@ -177,7 +179,6 @@ GpiObjHdl* VpiImpl::create_gpi_obj_from_handle(vpiHandle new_hdl,
         case vpiInterface:
         case vpiModport:
         case vpiRefObj:
-        case vpiPort:
         case vpiAlways:
         case vpiFunction:
         case vpiInitial:
@@ -258,7 +259,7 @@ GpiObjHdl* VpiImpl::native_check_create(std::string &name, GpiObjHdl *parent)
     }
 
     /* Generate Loops have inconsistent behavior across vpi tools.  A "name"
-     * without an index, i.e. dut.loop vs dut.loop[0], will find a handle to vpiGenScopeArray, 
+     * without an index, i.e. dut.loop vs dut.loop[0], will find a handle to vpiGenScopeArray,
      * but not all tools support iterating over the vpiGenScopeArray.  We don't want to create
      * a GpiObjHdl to this type of vpiHandle.
      *
@@ -398,6 +399,7 @@ GpiObjHdl* VpiImpl::native_check_create(int32_t index, GpiObjHdl *parent)
     }
     return new_obj;
 }
+#define VERILATOR
 
 GpiObjHdl *VpiImpl::get_root_handle(const char* name)
 {
@@ -405,7 +407,15 @@ GpiObjHdl *VpiImpl::get_root_handle(const char* name)
     vpiHandle iterator;
     GpiObjHdl *rv;
     std::string root_name;
+#ifdef VERILATOR
+    root = vpi_handle_by_name((PLI_BYTE8*)"TOP.our", NULL);
 
+    const char* n = vpi_get_str(vpiFullName, root);
+    printf("Module name: %s\n", n);  // Prints "readme"
+
+    uint32_t  t = vpi_get(vpiType, root);
+    printf("got vpi type %d\n", t);
+#else
     // vpi_iterate with a ref of NULL returns the top level module
     iterator = vpi_iterate(vpiModule, NULL);
     check_vpi_error();
@@ -419,17 +429,21 @@ GpiObjHdl *VpiImpl::get_root_handle(const char* name)
         if (name == NULL || !strcmp(name, vpi_get_str(vpiFullName, root)))
             break;
     }
+#endif
+
+
 
     if (!root) {
         check_vpi_error();
         goto error;
     }
-
+#ifndef VERILATOR
     // Need to free the iterator if it didn't return NULL
     if (iterator && !vpi_free_object(iterator)) {
         LOG_WARN("VPI: Attempting to free root iterator failed!");
         check_vpi_error();
     }
+#endif
 
     root_name = vpi_get_str(vpiFullName, root);
     rv = new GpiObjHdl(this, root, to_gpi_objtype(vpi_get(vpiType, root)));
@@ -543,6 +557,9 @@ int32_t handle_vpi_callback(p_cb_data cb_data)
         LOG_CRITICAL("VPI: Callback data corrupted: ABORTING");
     }
 
+    LOG_ERROR("VPI: Got callback of type %s(%d)",
+              cb_hdl->m_impl->reason_to_string(cb_data->reason), cb_data->reason);
+
     gpi_cb_state_e old_state = cb_hdl->get_call_state();
 
     if (old_state == GPI_PRIMED) {
@@ -572,6 +589,8 @@ static void register_embed(void)
     vpi_table = new VpiImpl("VPI");
     gpi_register_impl(vpi_table);
     gpi_load_extra_libs();
+
+    printf("embed registered\n");
 }
 
 
@@ -579,6 +598,8 @@ static void register_initial_callback(void)
 {
     sim_init_cb = new VpiStartupCbHdl(vpi_table);
     sim_init_cb->arm_callback();
+
+    printf("initial callback registered\n");
 }
 
 static void register_final_callback(void)
