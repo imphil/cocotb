@@ -35,6 +35,26 @@ to start and stop generation of input data.
 A :class:`.TestFactory` is used to generate the random tests.
 
 
+Matrix Multiplier
+=================
+
+The directory :file:`cocotb/examples/matrix_multiplier` contains a module for multiplying two matrices together, implemented in both VHDL and Verilog.
+
+The module takes two matrices ``A`` and ``B`` as inputs and provides the resulting matrix ``C`` as an output. When input ``i_valid`` is high on a rising clock edge, ``C`` is calculated and output, and ``o_valid`` goes high.
+
+The testbench defines ``MatrixInMonitor`` and ``MatrixOutMonitor`` (both sub-classes of :class:`.BusMonitor`) and a test case ``test_multiply``.
+
+``MatrixInMonitor`` watches for valid input matrices, does the multiplication and stores the result as the expected output matrix.
+
+``MatrixOutMonitor`` watches for valid output matrices and compares the result to the expected value.
+
+The testbench makes use of :class:`.TestFactory` and random data generators to test many sets of matrices, and :class:`.Scoreboard` to compare expected and actual results.
+
+The number of data bits for each entry in the matrices, as well as the row and column counts for each matrix are configurable in the Makefile.
+
+.. note::
+    The testbench makes use of helper functions for compatibility with simulators that support multi-dimensional arrays and those that do not.
+
 Mean
 ====
 

@@ -31,6 +31,7 @@ EXAMPLES := adder/tests \
             axi_lite_slave/tests \
             dff/tests \
             endian_swapper/tests \
+            matrix_multiplier/tests \
             mean/tests \
             mixed_language/tests
 # requires root permissions: ping_tun_tap/tests
