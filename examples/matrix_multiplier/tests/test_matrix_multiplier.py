@@ -43,15 +43,14 @@ else:
 class MatrixMonitor(BusMonitor):
     """Base class for monitoring inputs/outputs of Matrix Multiplier."""
     def __init__(self, dut, callback=None, event=None):
-        BusMonitor.__init__(self, dut, self._prefix, dut.clk, callback=callback, event=event)
+        super().__init__(dut, "", dut.clk_i, callback=callback, event=event)
 
 
 class MatrixInMonitor(MatrixMonitor):
     """Monitor inputs to Matrix Multiplier module and generate expected results
     for each multiplication operation.
     """
-    _prefix = "i"
-    _signals = ["A", "B", "valid"]
+    _signals =  {"A": "a_i", "B": "b_i", "valid": "valid_i"}
 
     async def _monitor_recv(self):
         while True:
@@ -87,8 +86,7 @@ class MatrixOutMonitor(MatrixMonitor):
     """Monitor outputs from Matrix Multiplier module and capture resulting matrix
     for each multiplication operation.
     """
-    _prefix = "o"
-    _signals = ["C", "valid"]
+    _signals = {"C": "c_o", "valid": "valid_o"}
 
     async def _monitor_recv(self):
         while True:
@@ -104,7 +102,7 @@ class MatrixOutMonitor(MatrixMonitor):
 async def test_multiply(dut, a_data, b_data):
     """Test multiplication of many matrices."""
 
-    cocotb.fork(Clock(dut.clk, 5, units='ns').start())
+    cocotb.fork(Clock(dut.clk_i, 5, units='ns').start())
 
     dut._log.info("Multi-Dimensional Array support: %s", MULTI_DIMENSIONAL_ARRAYS)
     expected_output = []
@@ -119,27 +117,27 @@ async def test_multiply(dut, a_data, b_data):
     scoreboard.add_interface(out_monitor, expected_output)
 
     # Initial values
-    dut.i_valid <= 0
-    set_matrix_value(dut.i_A, next(gen_a(1, lambda x: 0)))
-    set_matrix_value(dut.i_B, next(gen_b(1, lambda x: 0)))
+    dut.valid_i <= 0
+    set_matrix_value(dut.a_i, next(gen_a(1, lambda x: 0)))
+    set_matrix_value(dut.b_i, next(gen_b(1, lambda x: 0)))
 
     # Reset DUT
-    dut.reset <= 1
+    dut.reset_i <= 1
     for _ in range(3):
-        await RisingEdge(dut.clk)
-    dut.reset <= 0
+        await RisingEdge(dut.clk_i)
+    dut.reset_i <= 0
 
     # Do multiplication
     for A, B in zip(a_data(), b_data()):
-        await RisingEdge(dut.clk)
-        set_matrix_value(dut.i_A, A)
-        set_matrix_value(dut.i_B, B)
-        dut.i_valid <= 1
+        await RisingEdge(dut.clk_i)
+        set_matrix_value(dut.a_i, A)
+        set_matrix_value(dut.b_i, B)
+        dut.valid_i <= 1
 
-        await RisingEdge(dut.clk)
-        dut.i_valid <= 0
+        await RisingEdge(dut.clk_i)
+        dut.valid_i <= 0
 
-    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk_i)
 
     raise scoreboard.result
 
