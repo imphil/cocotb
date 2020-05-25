@@ -843,7 +843,12 @@ class Scheduler:
                 coro.kill()
 
         if self._main_thread is not threading.current_thread():
-            raise Exception("Cleanup() called outside of the main thread")
+            s = "cleanup() called from thread %s (%d) instead of the main thread (%d)." % (
+                threading.current_thread().name, threading.current_thread().ident, self._main_thread.ident)
+            if cocotb.SIM_NAME.lower().startswith("riviera") or cocotb.SIM_NAME.lower().startswith("activehdl"):
+                self.log.error(s + " Ignoring for Aldec simulators, see issue #1859.")
+            else:
+                raise Exception(s)
 
         for ext in self._pending_threads:
             self.log.warn("Waiting for %s to exit", ext.thread)
